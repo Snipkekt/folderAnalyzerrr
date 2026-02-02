@@ -4,23 +4,22 @@
 #include <map>
 #include <algorithm>
 #include <iomanip>
-#include <sstream>
 #include <fstream>
 
 namespace fs = std::filesystem;
 using namespace std;
 
-
+// store info about each file
 struct FileInfo {
-    string path;       
-    string extension;  
-    uintmax_t size;    
-    fs::file_time_type mod_time; 
+    string path;       // full file path
+    string extension;  // file extension (.txt, .jpg, etc.)
+    uintmax_t size;    // file size in bytes
+    fs::file_time_type mod_time; // last modified time
 };
 
-vector<FileInfo> allFiles; 
+vector<FileInfo> allFiles; // will hold info for all files found
 
-
+// helper to make sizes readable (B, KB, MB, GB)
 string formatSize(uintmax_t size) {
     double s = size;
     if (s < 1024) return to_string(s) + " B";
@@ -32,14 +31,14 @@ string formatSize(uintmax_t size) {
     return to_string(s) + " GB";
 }
 
- 
+// recursively scan a folder and its subfolders
 void scanFolder(const fs::path& path) {
     try {
         for (auto& entry : fs::directory_iterator(path)) {
             if (entry.is_directory()) {
-                scanFolder(entry.path()); 
+                scanFolder(entry.path()); // dive into subfolder
             } else if (entry.is_regular_file()) {
-                
+                // store the file info
                 FileInfo f;
                 f.path = entry.path().string();
                 f.extension = entry.path().extension().string();
@@ -49,19 +48,19 @@ void scanFolder(const fs::path& path) {
             }
         }
     } catch (fs::filesystem_error &e) {
-        
+        // some files/folders can't be accessed, just warn
         cerr << "Can't access " << path << ": " << e.what() << endl;
     }
 }
 
-
+// show a summary in the console
 void printSummary() {
     cout << "\n===== FILE SYSTEM SUMMARY =====\n";
     cout << "Total files: " << allFiles.size() << "\n";
 
     uintmax_t totalSize = 0;
-    map<string, int> extCount;       
-    map<string, uintmax_t> extSize;  
+    map<string, int> extCount;       // count per extension
+    map<string, uintmax_t> extSize;  // total size per extension
 
     for (auto &f : allFiles) {
         totalSize += f.size;
@@ -71,7 +70,7 @@ void printSummary() {
 
     cout << "Total size: " << formatSize(totalSize) << "\n";
 
-    
+    // show top 5 extensions by count
     vector<pair<string,int>> sortedExt(extCount.begin(), extCount.end());
     sort(sortedExt.begin(), sortedExt.end(), [](auto &a, auto &b){ return a.second > b.second; });
 
@@ -81,14 +80,14 @@ void printSummary() {
         cout << sortedExt[i].first << " : " << sortedExt[i].second 
              << " files, " << formatSize(extSize[sortedExt[i].first]) << "\n";
 
-    
+    // show 10 largest files
     sort(allFiles.begin(), allFiles.end(), [](FileInfo &a, FileInfo &b){ return a.size > b.size; });
     cout << "\nTop 10 largest files:\n";
     for(int i=0; i<min(10,(int)allFiles.size()); i++)
         cout << allFiles[i].path << " : " << formatSize(allFiles[i].size) << "\n";
 }
 
-
+// write the report in JSON so other programs can use it
 void writeJSON(const string &filename) {
     ofstream out(filename);
     out << "{\n";
@@ -140,11 +139,11 @@ int main() {
         return 1;
     }
 
-    scanFolder(folder);   
-    printSummary();       
+    scanFolder(folder);   // start scanning
+    printSummary();       // show summary in console
 
     string jsonFile = "report.json";
-    writeJSON(jsonFile);  
+    writeJSON(jsonFile);  // also save JSON report
 
     return 0;
 }
